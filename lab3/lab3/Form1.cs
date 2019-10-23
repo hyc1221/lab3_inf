@@ -17,11 +17,50 @@ namespace lab3
             InitializeComponent();
         }
         int N = 26;
-        double[,] px, tau;
-        double[,,] pxy;
+        double[] C, I, Cs, Is, taus, hx, Vy, hxy;
+        double[,] px, tau, py;
+        double[,,] pxy, s_pxy;
         Random rand = new Random();
         int K = 1;
         int round = 10;
+
+        public void Calc_CI(int kv)
+        {
+            C = new double[kv];
+            I = new double[kv];
+            Vy = new double[kv];
+            taus = new double[kv];
+            Calc_Hx(K);
+            for (int k = 0; k < K; k++)
+            {
+                taus[k] = 0;
+                for (int i = 0; i < N; i++)
+                    taus[k] += px[k, i] * tau[k, i];
+                Vy[k] = 1.0 / taus[k];
+                C[k] = Vy[k] * Math.Log(N, 2);
+                I[k] = Vy[k] * hx[k];
+            }
+        }
+
+        public void Calc_Is(int kv)
+        {
+            Is = new double[kv];
+            Calc_Hxy(K);
+            for (int k = 0; k < kv; k++)
+            {
+                Is[k] = Vy[k] * (hx[k] - hxy[k]);
+            }
+        }
+
+        public void Calc_Hx(int kv)
+        {
+            hx = new double[kv];
+            for (int k = 0; k < kv; k++)
+            {
+                hx[k] = 0;
+                for (int i = 0; i < N; i++) hx[k] -= px[k, i] * Math.Log(px[k, i], 2);
+            }
+        }
 
         public void Calc_pxy(int kv)
         {
@@ -94,6 +133,47 @@ namespace lab3
             }
         }
 
+        public void Calc_Hxy(int kv)
+        {
+            hxy = new double[kv];
+            Calc_s_pxy(K);
+            for (int k = 0; k < kv; k++)
+            {
+                hxy[k] = 0;
+                for (int i = 0; i < N; i++)
+                    for (int j = 0; j < N; j++)
+                        hxy[k] -= s_pxy[k, i, j] * Math.Log(pxy[k, i, j], 2);
+            }
+        }
+
+        public void Calc_py(int kv)
+        {
+            py = new double[kv, N];
+            for (int k = 0; k < kv; k++)
+            {
+                for (int i = 0; i < N; i++) py[k, i] = 0;
+                for (int j = 0; j < N; j++)
+                {
+                    for (int i = 0; i < N; i++)
+                    {
+                        py[k, j] += px[k, i] * pxy[k, i, j];
+                    }
+                }
+            }
+        }
+
+        public void Calc_s_pxy(int kv)
+        {
+            Calc_py(K);
+            s_pxy = new double[kv, N, N];
+            for (int k = 0; k < K; k++)
+            {
+                for (int i = 0; i < N; i++)
+                    for (int j = 0; j < N; j++)
+                        s_pxy[k, i, j] = py[k, j] * pxy[k, i, j];
+            }
+        }
+
         private void button1_Click(object sender, EventArgs e)
         {
             Calc_px(K);
@@ -102,6 +182,9 @@ namespace lab3
             Output_tau(K - 1);
             Calc_pxy(K);
             Output_pxy(K - 1, true);
+            Calc_CI(K);
+            Calc_Is(K);
+            Output_CI(K - 1);
         }
 
         public void Output_px(int k)
@@ -154,6 +237,14 @@ namespace lab3
                     richTextBox2.Find(String.Format("{0:f17} ", pxy[k, i, i]));
                     richTextBox2.SelectionColor = Color.Red;
                 }
+        }
+
+        public void Output_CI(int k)
+        {
+            richTextBox4.Clear();
+            richTextBox4.AppendText("C без помех = " + Math.Round(C[k], round) + "\n");
+            richTextBox4.AppendText("I(x,y) без помех = " + Math.Round(I[k], round) + "\n");
+            richTextBox4.AppendText("I(x,y) с помехами = " + Math.Round(Is[k], round) + "\n");
         }
     }
 }
