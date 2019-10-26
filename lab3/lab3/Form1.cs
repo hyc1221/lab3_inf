@@ -15,15 +15,20 @@ namespace lab3
         public Form1()
         {
             InitializeComponent();
+            comboBox1.SelectedIndex = 1;
+            sc = comboBox1.SelectedItem.ToString();
+            scv = 1;
         }
         int N = 26;
+        double sC, sI, sCs, sIs, scv;
         double[] C, I, Cs, Is, taus, hx, Vy, hxy;
         double[,] px, tau, py;
         double[,,] pxy, s_pxy;
         Random rand = new Random();
         int K = 1;
         int round = 10;
-
+        bool changed = false;
+        string sc;
         public void Calc_CI(int kv)
         {
             C = new double[kv];
@@ -39,16 +44,59 @@ namespace lab3
                 Vy[k] = 1.0 / taus[k];
                 C[k] = Vy[k] * Math.Log(N, 2);
                 I[k] = Vy[k] * hx[k];
+                sC += C[k];
+                sI += I[k];
             }
+            sC /= K;
+            sI /= K;
         }
 
-        public void Calc_Is(int kv)
+        public void Calc_CIs(int kv)
         {
             Is = new double[kv];
-            Calc_Hxy(K);
+            Cs = new double[kv];
+            sIs = 0;
+            sCs = 0;
+            Calc_Hxy(K, false);
             for (int k = 0; k < kv; k++)
             {
                 Is[k] = Vy[k] * (hx[k] - hxy[k]);
+                sIs += Is[k];
+            }
+            Calc_Hxy(K, true);
+            for (int k = 0; k < kv; k++)
+            {
+                Cs[k] = Vy[k] * (Math.Log(N, 2) - hxy[k]);
+                sCs += Cs[k];
+            }
+            sIs /= K;
+            sCs /= K;
+        }
+
+        private void numericUpDown4_ValueChanged(object sender, EventArgs e)
+        {
+            if (changed)
+            {
+                round = Convert.ToInt32(numericUpDown4.Value);
+                int k = Convert.ToInt32(numericUpDown3.Value) - 1;
+                Output_px(k);
+                Output_tau(k);
+                Output_pxy(k, false);
+                Output_CI(K);
+            }
+        }
+        private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (changed)
+            {
+                sc = comboBox1.SelectedItem.ToString();
+                switch (comboBox1.SelectedIndex)
+                {
+                    case 0: scv = 1; break;
+                    case 1: scv = 1000; break;
+                    case 2: scv = 1000000; break;
+                }
+                Output_CI(K);
             }
         }
 
@@ -80,6 +128,17 @@ namespace lab3
                     }
                     pxy[k, i, i] = 1 - s;
                 }
+            }
+        }
+
+        private void numericUpDown3_ValueChanged(object sender, EventArgs e)
+        {
+            if (changed)
+            {
+                int k = Convert.ToInt32(numericUpDown3.Value) - 1;  
+                Output_px(k);
+                Output_tau(k);
+                Output_pxy(k, true);
             }
         }
 
@@ -133,10 +192,10 @@ namespace lab3
             }
         }
 
-        public void Calc_Hxy(int kv)
+        public void Calc_Hxy(int kv, bool peres)
         {
             hxy = new double[kv];
-            Calc_s_pxy(K);
+            Calc_s_pxy(K, peres);
             for (int k = 0; k < kv; k++)
             {
                 hxy[k] = 0;
@@ -146,7 +205,7 @@ namespace lab3
             }
         }
 
-        public void Calc_py(int kv)
+        public void Calc_py(int kv, bool peres)
         {
             py = new double[kv, N];
             for (int k = 0; k < kv; k++)
@@ -156,15 +215,16 @@ namespace lab3
                 {
                     for (int i = 0; i < N; i++)
                     {
-                        py[k, j] += px[k, i] * pxy[k, i, j];
+                        if (peres) py[k, j] += (1.0 / N) * pxy[k, i, j];
+                        else py[k, j] += px[k, i] * pxy[k, i, j];
                     }
                 }
             }
         }
 
-        public void Calc_s_pxy(int kv)
+        public void Calc_s_pxy(int kv, bool peres)
         {
-            Calc_py(K);
+            Calc_py(K, peres);
             s_pxy = new double[kv, N, N];
             for (int k = 0; k < K; k++)
             {
@@ -176,15 +236,22 @@ namespace lab3
 
         private void button1_Click(object sender, EventArgs e)
         {
+            numericUpDown3.Maximum = numericUpDown2.Value;
+            numericUpDown3.Value = 1;
+            N = Convert.ToInt32(numericUpDown1.Value);
+            K = Convert.ToInt32(numericUpDown2.Value);
+            round = Convert.ToInt32(numericUpDown4.Value);
+            int k = 0;
             Calc_px(K);
             Calc_tau(K);
-            Output_px(K - 1);
-            Output_tau(K - 1);
+            Output_px(k);
+            Output_tau(k);
             Calc_pxy(K);
-            Output_pxy(K - 1, true);
+            Output_pxy(k, true);
             Calc_CI(K);
-            Calc_Is(K);
-            Output_CI(K - 1);
+            Calc_CIs(K);
+            Output_CI(K);
+            changed = true;
         }
 
         public void Output_px(int k)
@@ -239,12 +306,23 @@ namespace lab3
                 }
         }
 
-        public void Output_CI(int k)
+        public void Output_CI(int kv)
         {
             richTextBox4.Clear();
-            richTextBox4.AppendText("C без помех = " + Math.Round(C[k], round) + "\n");
-            richTextBox4.AppendText("I(x,y) без помех = " + Math.Round(I[k], round) + "\n");
-            richTextBox4.AppendText("I(x,y) с помехами = " + Math.Round(Is[k], round) + "\n");
+            textBox1.Text = Math.Round(sI / scv, round).ToString() + " " + sc;
+            textBox2.Text = Math.Round(sC / scv, round).ToString() + " " + sc;
+            textBox3.Text = Math.Round(sIs / scv, round).ToString() + " " + sc;
+            textBox4.Text = Math.Round(sCs / scv, round).ToString() + " " + sc;
+            for (int k = 0; k < kv; k++)
+            {
+                richTextBox4.AppendText("Эксперимент " + (k + 1).ToString() + ": \n");
+                richTextBox4.AppendText("Без помех: \n");
+                richTextBox4.AppendText("C = " + Math.Round(C[k] / scv, round) + " " + sc + "\n");
+                richTextBox4.AppendText("I(x,y) = " + Math.Round(I[k] / scv, round) + " " + sc + "\n\n");
+                richTextBox4.AppendText("С помехами: \n");
+                richTextBox4.AppendText("C = " + Math.Round(Cs[k] / scv, round) + " " + sc +"\n");
+                richTextBox4.AppendText("I(x,y) = " + Math.Round(Is[k] / scv, round) + " " + sc + "\n----------------------------------------------------\n");
+            }
         }
     }
 }
